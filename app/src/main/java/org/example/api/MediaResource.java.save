@@ -1,0 +1,27 @@
+package org.example.api;
+
+impojakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@Path("/media")
+public class MediaResource {
+
+    @GET
+    @Path("/list")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getMediaList() {
+        List<Media> mediaList = new ArrayList<>();
+
+        try (Connection conn = DriverManager.getConnection(
+                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+
+            String query = "SELECT media_id, title, description, high_res_url, low_res_url FROM media";
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+                while (rs.next()) {
+                    Media media = new Media();
+                    media.setMediaId(rs.getInt("media_id"));
+                    m

@@ -1,0 +1,7 @@
+Reusing configuration cache.
+> Task :app:compileJava UP-TO-DATE
+> Task :app:processResources UP-TO-DATE
+> Task :app:classes UP-TO-DATE
+
+> Task :app:run
+Server started on port 8080
