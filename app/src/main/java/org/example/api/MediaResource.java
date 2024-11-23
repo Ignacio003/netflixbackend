@@ -19,7 +19,7 @@ public class MediaResource {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
-                        System.out.println(label + ": " + line); // Print FFmpeg logs to the terminal
+                        System.out.println(label + ": " + line); 
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -45,7 +45,6 @@ public Response uploadMedia(
     File mp4File360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_360p.mp4"));
 
     try {
-        // Guardar el archivo subido
         try (FileOutputStream out = new FileOutputStream(uploadedFile)) {
             byte[] buffer = new byte[1024];
             int bytesRead;
@@ -54,7 +53,6 @@ public Response uploadMedia(
             }
         }
 
-        // Crear directorios para las versiones HLS
         if (!hlsDir1080p.exists()) {
             hlsDir1080p.mkdir();
         }
@@ -62,7 +60,6 @@ public Response uploadMedia(
             hlsDir360p.mkdir();
         }
 
-        // Convertir a HLS 1080p
         Process ffmpeg1080p = new ProcessBuilder(
                 "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
                 "-vf", "scale=-2:1080",
@@ -76,7 +73,6 @@ public Response uploadMedia(
         ).redirectErrorStream(true).start();
         new Thread(() -> printProcessOutput(ffmpeg1080p, "[1080p]")).start();
 
-        // Convertir a HLS 360p
         Process ffmpeg360p = new ProcessBuilder(
                 "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
                 "-vf", "scale=-2:360",
@@ -90,7 +86,6 @@ public Response uploadMedia(
         ).redirectErrorStream(true).start();
         new Thread(() -> printProcessOutput(ffmpeg360p, "[360p]")).start();
 
-        // Convertir a MP4 360p
         Process ffmpegMp4360p = new ProcessBuilder(
                 "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
                 "-vf", "scale=-2:360", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
@@ -99,7 +94,6 @@ public Response uploadMedia(
         ).redirectErrorStream(true).start();
         new Thread(() -> printProcessOutput(ffmpegMp4360p, "[MP4 360p]")).start();
 
-        // Esperar a que terminen ambos procesos
         int exitCode1080p = ffmpeg1080p.waitFor();
         int exitCode360p = ffmpeg360p.waitFor();
         int exitCodeMp4360p = ffmpegMp4360p.waitFor();
@@ -109,13 +103,11 @@ public Response uploadMedia(
                     .entity("Error generando las versiones HLS o MP4 360p").build();
         }
 
-        // Construir URLs
         String hlsUrl1080p = "http://34.175.133.0:8080/media/" + hlsDir1080p.getName() + "/playlist.m3u8";
         String hlsUrl360p = "http://34.175.133.0:8080/media/" + hlsDir360p.getName() + "/playlist.m3u8";
         String mp4Url360p = "http://34.175.133.0:8080/media/" + mp4File360p.getName();
         String downloadUrl = "http://34.175.133.0:8080/media/" + fileName;
 
-        // Guardar metadatos en la base de datos
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
@@ -124,7 +116,7 @@ public Response uploadMedia(
                 stmt.setString(1, title);
                 stmt.setString(2, description);
                 stmt.setString(3, downloadUrl);
-                stmt.setString(4, mp4Url360p); // URL del MP4 360p
+                stmt.setString(4, mp4Url360p);
                 stmt.setString(5, category);
                 stmt.setString(6, hlsUrl1080p);
                 stmt.setString(7, hlsUrl360p);
@@ -173,7 +165,6 @@ public Response deleteMedia(Media media) {
     try (Connection conn = DriverManager.getConnection(
             "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-        // Consulta para obtener las URLs de los archivos antes de eliminar el registro
         String selectQuery = "SELECT high_res_url, low_res_url FROM media WHERE media_id = ?";
         String deleteQuery = "DELETE FROM media WHERE media_id = ?";
 
@@ -185,7 +176,6 @@ public Response deleteMedia(Media media) {
                 String highResUrl = rs.getString("high_res_url");
                 String lowResUrl = rs.getString("low_res_url");
 
-                // Eliminar archivos físicos
                 File highResFile = new File(highResUrl.replace("http://localhost/media/", MEDIA_PATH + "/"));
                 File lowResFile = new File(lowResUrl.replace("http://localhost/media/", MEDIA_PATH + "/"));
 
@@ -196,7 +186,6 @@ public Response deleteMedia(Media media) {
                     lowResFile.delete();
                 }
 
-                // Eliminar registro de la base de datos
                 try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
                     deleteStmt.setInt(1, media.getMediaId());
                     int rowsAffected = deleteStmt.executeUpdate();
