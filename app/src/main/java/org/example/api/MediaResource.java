@@ -15,6 +15,16 @@ import java.util.List;
 
 @Path("/media")
 public class MediaResource {
+                private void printProcessOutput(Process process, String label) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        System.out.println(label + ": " + line); // Print FFmpeg logs to the terminal
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
     private static final String MEDIA_PATH = "/home/ignaciofortessoria/media";
 
 @POST
@@ -29,12 +39,14 @@ public Response uploadMedia(
         @FormDataParam("category") String category) {
 
     String fileName = fileMetaData.getFileName();
-    File highResFile = new File(MEDIA_PATH, fileName);
-    File lowResFile = new File(MEDIA_PATH, "low_" + fileName);
+    File uploadedFile = new File(MEDIA_PATH, fileName);
+    File hlsDir1080p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_1080p"));
+    File hlsDir360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_360p"));
+    File mp4File360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_360p.mp4"));
 
     try {
-
-        try (FileOutputStream out = new FileOutputStream(highResFile)) {
+        // Guardar el archivo subido
+        try (FileOutputStream out = new FileOutputStream(uploadedFile)) {
             byte[] buffer = new byte[1024];
             int bytesRead;
             while ((bytesRead = fileInputStream.read(buffer)) != -1) {
@@ -42,46 +54,80 @@ public Response uploadMedia(
             }
         }
 
-        String lowResPath = lowResFile.getAbsolutePath();
-        String highResPath = highResFile.getAbsolutePath();
-
-        Process ffmpegProcess = new ProcessBuilder(
-            "ffmpeg", "-i", highResPath, "-vf", "scale=-2:360", "-c:v", "libx264", "-preset", "fast", lowResPath
-        ).redirectErrorStream(true).start();
-
-        Thread outputThread = new Thread(() -> {
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(ffmpegProcess.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println(line); 
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        });
-        outputThread.start();
-
-        int exitCode = ffmpegProcess.waitFor();
-        outputThread.join(); // Esperar a que termine el hilo de la salida
-
-        if (exitCode != 0) {
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("Error generating low-resolution version").build();
+        // Crear directorios para las versiones HLS
+        if (!hlsDir1080p.exists()) {
+            hlsDir1080p.mkdir();
+        }
+        if (!hlsDir360p.exists()) {
+            hlsDir360p.mkdir();
         }
 
-        String highResUrl = "http://34.175.133.0:8080/media/" + fileName;
-        String lowResUrl = "http://34.175.133.0:8080/media/low_" + fileName;
+        // Convertir a HLS 1080p
+        Process ffmpeg1080p = new ProcessBuilder(
+                "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
+                "-vf", "scale=-2:1080",
+                "-start_number", "0",    
+                "-preset", "veryfast",
+                "-threads", "0",
+                "-hls_time", "10",
+                "-hls_list_size", "0",
+                "-f", "hls",
+                new File(hlsDir1080p, "playlist.m3u8").getAbsolutePath()
+        ).redirectErrorStream(true).start();
+        new Thread(() -> printProcessOutput(ffmpeg1080p, "[1080p]")).start();
 
+        // Convertir a HLS 360p
+        Process ffmpeg360p = new ProcessBuilder(
+                "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
+                "-vf", "scale=-2:360",
+                "-start_number", "0",
+                "-hls_time", "10",    
+                "-preset", "veryfast",
+                "-threads", "0",
+                "-hls_list_size", "0",
+                "-f", "hls",
+                new File(hlsDir360p, "playlist.m3u8").getAbsolutePath()
+        ).redirectErrorStream(true).start();
+        new Thread(() -> printProcessOutput(ffmpeg360p, "[360p]")).start();
+
+        // Convertir a MP4 360p
+        Process ffmpegMp4360p = new ProcessBuilder(
+                "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
+                "-vf", "scale=-2:360", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-c:a", "aac", "-strict", "experimental",
+                mp4File360p.getAbsolutePath()
+        ).redirectErrorStream(true).start();
+        new Thread(() -> printProcessOutput(ffmpegMp4360p, "[MP4 360p]")).start();
+
+        // Esperar a que terminen ambos procesos
+        int exitCode1080p = ffmpeg1080p.waitFor();
+        int exitCode360p = ffmpeg360p.waitFor();
+        int exitCodeMp4360p = ffmpegMp4360p.waitFor();
+
+        if (exitCode1080p != 0 || exitCode360p != 0 || exitCodeMp4360p != 0) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity("Error generando las versiones HLS o MP4 360p").build();
+        }
+
+        // Construir URLs
+        String hlsUrl1080p = "http://34.175.133.0:8080/media/" + hlsDir1080p.getName() + "/playlist.m3u8";
+        String hlsUrl360p = "http://34.175.133.0:8080/media/" + hlsDir360p.getName() + "/playlist.m3u8";
+        String mp4Url360p = "http://34.175.133.0:8080/media/" + mp4File360p.getName();
+        String downloadUrl = "http://34.175.133.0:8080/media/" + fileName;
+
+        // Guardar metadatos en la base de datos
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-            String query = "INSERT INTO media (title, description, high_res_url, low_res_url, category) VALUES (?, ?, ?, ?, ?)";
+            String query = "INSERT INTO media (title, description, high_res_url, low_res_url, category, hls_url_1080p, hls_url_360p) VALUES (?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, title);
                 stmt.setString(2, description);
-                stmt.setString(3, highResUrl); 
-                stmt.setString(4, lowResUrl);
+                stmt.setString(3, downloadUrl);
+                stmt.setString(4, mp4Url360p); // URL del MP4 360p
                 stmt.setString(5, category);
+                stmt.setString(6, hlsUrl1080p);
+                stmt.setString(7, hlsUrl360p);
                 stmt.executeUpdate();
             }
         }
@@ -95,6 +141,7 @@ public Response uploadMedia(
                 .entity("Error uploading media: " + e.getMessage()).build();
     }
 }
+
 @GET
 @Path("/{fileName}")
 @Produces(MediaType.APPLICATION_OCTET_STREAM)
