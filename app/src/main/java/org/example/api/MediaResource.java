@@ -133,6 +133,27 @@ public Response uploadMedia(
                 .entity("Error uploading media: " + e.getMessage()).build();
     }
 }
+@GET
+@Path("/{subPath: .*}")
+@Produces(MediaType.APPLICATION_OCTET_STREAM)
+public Response serveFile(@PathParam("subPath") String subPath) {
+    File file = new File(MEDIA_PATH, subPath);
+    if (!file.exists() || file.isDirectory()) {
+        return Response.status(Response.Status.NOT_FOUND)
+                .entity("File not found or path is a directory").build();
+    }
+
+    return Response.ok((StreamingOutput) output -> {
+        try (InputStream input = new FileInputStream(file)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = input.read(buffer)) != -1) {
+                output.write(buffer, 0, bytesRead);
+            }
+        }
+    }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"")
+    .build();
+}
 
 @GET
 @Path("/{fileName}")
@@ -156,56 +177,65 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
     .build();
 
 }
+    @DELETE
+    @Path("/delete")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response deleteMedia(Media media) {
+        try (Connection conn = DriverManager.getConnection(
+                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-@DELETE
-@Path("/delete")
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
-public Response deleteMedia(Media media) {
-    try (Connection conn = DriverManager.getConnection(
-            "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+            String selectQuery = "SELECT high_res_url, low_res_url, hls_url_1080p, hls_url_360p FROM media WHERE media_id = ?";
+            String deleteQuery = "DELETE FROM media WHERE media_id = ?";
 
-        String selectQuery = "SELECT high_res_url, low_res_url FROM media WHERE media_id = ?";
-        String deleteQuery = "DELETE FROM media WHERE media_id = ?";
+            try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
+                selectStmt.setInt(1, media.getMediaId());
+                ResultSet rs = selectStmt.executeQuery();
 
-        try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
-            selectStmt.setInt(1, media.getMediaId());
-            ResultSet rs = selectStmt.executeQuery();
+                if (rs.next()) {
+                    String highResUrl = rs.getString("high_res_url");
+                    String lowResUrl = rs.getString("low_res_url");
+                    String hlsUrl1080p = rs.getString("hls_url_1080p");
+                    String hlsUrl360p = rs.getString("hls_url_360p");
 
-            if (rs.next()) {
-                String highResUrl = rs.getString("high_res_url");
-                String lowResUrl = rs.getString("low_res_url");
+                    File highResFile = new File(highResUrl.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+                    File lowResFile = new File(lowResUrl.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+                    File hlsDir1080p = new File(hlsUrl1080p.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+                    File hlsDir360p = new File(hlsUrl360p.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
 
-                File highResFile = new File(highResUrl.replace("http://localhost/media/", MEDIA_PATH + "/"));
-                File lowResFile = new File(lowResUrl.replace("http://localhost/media/", MEDIA_PATH + "/"));
+                    deleteFileOrDirectory(highResFile);
+                    deleteFileOrDirectory(lowResFile);
+                    deleteFileOrDirectory(hlsDir1080p);
+                    deleteFileOrDirectory(hlsDir360p);
 
-                if (highResFile.exists()) {
-                    highResFile.delete();
-                }
-                if (lowResFile.exists()) {
-                    lowResFile.delete();
-                }
+                    try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
+                        deleteStmt.setInt(1, media.getMediaId());
+                        int rowsAffected = deleteStmt.executeUpdate();
 
-                try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
-                    deleteStmt.setInt(1, media.getMediaId());
-                    int rowsAffected = deleteStmt.executeUpdate();
-
-                    if (rowsAffected == 0) {
-                        return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
+                        if (rowsAffected == 0) {
+                            return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
+                        }
+                        return Response.ok("Media deleted successfully!").build();
                     }
-                    return Response.ok("Media deleted successfully!").build();
+                } else {
+                    return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
                 }
-            } else {
-                return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
+
             }
-
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
         }
-    } catch (SQLException e) {
-        e.printStackTrace();
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
     }
-}
 
+    private void deleteFileOrDirectory(File fileOrDirectory) {
+        if (fileOrDirectory.isDirectory()) {
+            for (File child : fileOrDirectory.listFiles()) {
+                deleteFileOrDirectory(child);
+            }
+        }
+        fileOrDirectory.delete();
+    }
 
     @POST
     @Path("/add")
@@ -241,7 +271,7 @@ public Response deleteMedia(Media media) {
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-            String query = "SELECT media_id, title, description, high_res_url, low_res_url FROM media WHERE category = ?";
+            String query = "SELECT media_id, title, description, high_res_url, low_res_url, hls_url_1080p, hls_url_360p FROM media WHERE category = ?";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, category);
                 ResultSet rs = stmt.executeQuery();
@@ -252,6 +282,8 @@ public Response deleteMedia(Media media) {
                     media.setDescription(rs.getString("description"));
                     media.setHighResUrl(rs.getString("high_res_url"));
                     media.setLowResUrl(rs.getString("low_res_url"));
+                    media.setHlsUrl1080p(rs.getString("hls_url_1080p"));
+                    media.setHlsUrl360p(rs.getString("hls_url_360p"));
                     mediaList.add(media);
                 }
             }
@@ -262,46 +294,45 @@ public Response deleteMedia(Media media) {
             e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
         }
-    }
+    }@GET
+@Path("/list")
+@Produces(MediaType.APPLICATION_JSON)
+public Response listMedia() {
+    List<Media> mediaList = new ArrayList<>();
+    try (Connection conn = DriverManager.getConnection(
+            "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-    @GET
-    @Path("/list")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getMediaList() {
-        List<Media> mediaList = new ArrayList<>();
-
-        try (Connection conn = DriverManager.getConnection(
-                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-
-            String query = "SELECT media_id, title, description, high_res_url, low_res_url, category FROM media";
-            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
-                while (rs.next()) {
-                    Media media = new Media();
-                    media.setMediaId(rs.getInt("media_id"));
-                    media.setTitle(rs.getString("title"));
-                    media.setDescription(rs.getString("description"));
-                    media.setHighResUrl(rs.getString("high_res_url"));
-                    media.setLowResUrl(rs.getString("low_res_url"));
-                    media.setCategory(rs.getString("category"));
-                    mediaList.add(media);
-                }
+        String query = "SELECT media_id, title, description, high_res_url, low_res_url, category, hls_url_1080p, hls_url_360p FROM media";
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+            while (rs.next()) {
+                Media media = new Media();
+                media.setMediaId(rs.getInt("media_id"));
+                media.setTitle(rs.getString("title"));
+                media.setDescription(rs.getString("description"));
+                media.setHighResUrl(rs.getString("high_res_url"));
+                media.setLowResUrl(rs.getString("low_res_url"));
+                media.setCategory(rs.getString("category"));
+                media.setHlsUrl1080p(rs.getString("hls_url_1080p"));
+                media.setHlsUrl360p(rs.getString("hls_url_360p"));
+                mediaList.add(media);
             }
-
-            return Response.ok(mediaList).build();
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
         }
+        return Response.ok(mediaList).build();
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
     }
+}
 
-    public static class Media {
+    public class Media {
         private int mediaId;
         private String title;
         private String description;
         private String highResUrl;
         private String lowResUrl;
         private String category;
+        private String hlsUrl1080p;
+        private String hlsUrl360p;
 
         public int getMediaId() {
             return mediaId;
@@ -349,6 +380,22 @@ public Response deleteMedia(Media media) {
 
         public void setCategory(String category) {
             this.category = category;
+        }
+
+        public String getHlsUrl1080p() {
+            return hlsUrl1080p;
+        }
+
+        public void setHlsUrl1080p(String hlsUrl1080p) {
+            this.hlsUrl1080p = hlsUrl1080p;
+        }
+
+        public String getHlsUrl360p() {
+            return hlsUrl360p;
+        }
+
+        public void setHlsUrl360p(String hlsUrl360p) {
+            this.hlsUrl360p = hlsUrl360p;
         }
     }
 }
