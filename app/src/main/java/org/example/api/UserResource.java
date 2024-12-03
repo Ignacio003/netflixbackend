@@ -42,14 +42,13 @@ public class UserResource {
     public Response loginUser(User user) {
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-    
+
             String query = "SELECT password_hash FROM users WHERE username = ?";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, user.getUsername());
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
                         String storedHash = rs.getString("password_hash");
-                        // Verifica la contraseña ingresada con la almacenada (hash)
                         if (BCrypt.checkpw(user.getPasswordHash(), storedHash)) {
                             return Response.ok("{\"message\":\"Login successful!\"}").build();
                         } else {
@@ -60,7 +59,7 @@ public class UserResource {
                     }
                 }
             }
-    
+
         } catch (SQLException e) {
             e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
@@ -73,7 +72,6 @@ public class UserResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response registerUser(User user) {
-        // Validar que el nombre de usuario y la contraseña no sean vacíos y tengan al menos 2 caracteres
         if (user.getUsername() == null || user.getUsername().length() < 2) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Username must be at least 2 characters long\"}").build();
         }
@@ -84,7 +82,6 @@ public class UserResource {
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-            // Verificar si el nombre de usuario ya existe
             String checkQuery = "SELECT COUNT(*) FROM users WHERE username = ?";
             try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
                 checkStmt.setString(1, user.getUsername());
@@ -95,14 +92,12 @@ public class UserResource {
                 }
             }
 
-            // Cifra la contraseña antes de guardarla en la base de datos
             String hashedPassword = BCrypt.hashpw(user.getPasswordHash(), BCrypt.gensalt());
-
-            // Insertar el nuevo usuario en la base de datos
-            String query = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
+            String query = "INSERT INTO users (username, password_hash, es_admin) VALUES (?, ?, ?)";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, user.getUsername());
                 stmt.setString(2, hashedPassword);
+                stmt.setBoolean(3, user.isEsAdmin());
                 stmt.executeUpdate();
             }
 
@@ -114,15 +109,53 @@ public class UserResource {
         }
     }
 
+    // Método para iniciar sesión como administrador
+    @POST
+    @Path("/loginadmin")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response loginAdmin(User user) {
+        try (Connection conn = DriverManager.getConnection(
+                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+
+            String query = "SELECT password_hash, es_admin FROM users WHERE username = ?";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setString(1, user.getUsername());
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        String storedHash = rs.getString("password_hash");
+                        boolean isAdmin = rs.getBoolean("es_admin");
+
+                        if (BCrypt.checkpw(user.getPasswordHash(), storedHash) && isAdmin) {
+                            return Response.ok("{\"message\":\"Admin login successful!\"}").build();
+                        } else {
+                            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid credentials or not an admin\"}").build();
+                        }
+                    } else {
+                        return Response.status(Response.Status.NOT_FOUND).entity("{\"message\":\"User not found\"}").build();
+                    }
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
+        }
+    }
+
     // Clase interna para manejar el usuario en el cuerpo de las peticiones
     public static class User {
         private String username;
         private String passwordHash;
+        private boolean esAdmin;
 
         public String getUsername() { return username; }
         public void setUsername(String username) { this.username = username; }
 
         public String getPasswordHash() { return passwordHash; }
         public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+
+        public boolean isEsAdmin() { return esAdmin; }
+        public void setEsAdmin(boolean esAdmin) { this.esAdmin = esAdmin; }
     }
 }
