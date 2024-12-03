@@ -12,17 +12,16 @@ public class UserResource {
     // Método para eliminar un usuario
     @DELETE
     @Path("/delete")
-    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response deleteUser(User user) {
+    public Response deleteUser(@QueryParam("username") String username) {
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
             String query = "DELETE FROM users WHERE username = ?";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
-                stmt.setString(1, user.getUsername());
+                stmt.setString(1, username);
                 int rowsAffected = stmt.executeUpdate();
-                
+
                 if (rowsAffected == 0) {
                     return Response.status(Response.Status.NOT_FOUND).entity("{\"message\":\"User not found\"}").build();
                 }
