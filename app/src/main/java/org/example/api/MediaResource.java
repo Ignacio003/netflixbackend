@@ -176,12 +176,12 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
     }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"")
     .build();
 
-}
+    }
     @DELETE
     @Path("/delete")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response deleteMedia(Media media) {
+    public Response deleteMedia(@QueryParam("mediaid") int mediaid) {
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
@@ -189,7 +189,7 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
             String deleteQuery = "DELETE FROM media WHERE media_id = ?";
 
             try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
-                selectStmt.setInt(1, media.getMediaId());
+                selectStmt.setInt(1, mediaid); // Corrección aquí
                 ResultSet rs = selectStmt.executeQuery();
 
                 if (rs.next()) {
@@ -209,18 +209,21 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
                     deleteFileOrDirectory(hlsDir360p);
 
                     try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
-                        deleteStmt.setInt(1, media.getMediaId());
+                        deleteStmt.setInt(1, mediaid); // Corrección aquí
                         int rowsAffected = deleteStmt.executeUpdate();
 
                         if (rowsAffected == 0) {
                             return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
                         }
-                        return Response.ok("Media deleted successfully!").build();
+                        return Response.ok("{\"message\":\"Media deleted successfully!\"}").type(MediaType.APPLICATION_JSON).build();
                     }
                 } else {
-                    return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
-                }
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity("{\"message\":\"Media not found\"}")
+                        .type(MediaType.APPLICATION_JSON)
+                        .build();
 
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
