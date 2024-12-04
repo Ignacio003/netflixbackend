@@ -15,6 +15,19 @@ import java.util.List;
 
 @Path("/media")
 public class MediaResource {
+            private void cleanup(File... files) {
+            for (File file : files) {
+                if (file.exists()) {
+                    if (file.isDirectory()) {
+                        for (File child : file.listFiles()) {
+                            child.delete();
+                        }
+                    }
+                    file.delete();
+                }
+            }
+        }
+
                 private void printProcessOutput(Process process, String label) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
@@ -60,10 +73,11 @@ public Response uploadMedia(
             hlsDir360p.mkdir();
         }
 
+        // Procesos de ffmpeg
         Process ffmpeg1080p = new ProcessBuilder(
                 "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
                 "-vf", "scale=-2:1080",
-                "-start_number", "0",    
+                "-start_number", "0",
                 "-preset", "veryfast",
                 "-threads", "0",
                 "-hls_time", "10",
@@ -77,7 +91,7 @@ public Response uploadMedia(
                 "ffmpeg", "-i", uploadedFile.getAbsolutePath(),
                 "-vf", "scale=-2:360",
                 "-start_number", "0",
-                "-hls_time", "10",    
+                "-hls_time", "10",
                 "-preset", "veryfast",
                 "-threads", "0",
                 "-hls_list_size", "0",
@@ -99,6 +113,7 @@ public Response uploadMedia(
         int exitCodeMp4360p = ffmpegMp4360p.waitFor();
 
         if (exitCode1080p != 0 || exitCode360p != 0 || exitCodeMp4360p != 0) {
+            cleanup(uploadedFile, hlsDir1080p, hlsDir360p, mp4File360p);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity("Error generando las versiones HLS o MP4 360p").build();
         }
@@ -129,6 +144,7 @@ public Response uploadMedia(
 
     } catch (Exception e) {
         e.printStackTrace();
+        cleanup(uploadedFile, hlsDir1080p, hlsDir360p, mp4File360p);
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                 .entity("Error uploading media: " + e.getMessage()).build();
     }
