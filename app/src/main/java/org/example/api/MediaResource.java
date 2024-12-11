@@ -11,6 +11,14 @@ import java.io.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+// Dependencias JWT
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+
+import java.security.Key;
+import java.util.Date;
+import org.example.api.JwtUtils;
 
 
 @Path("/media")
@@ -27,8 +35,20 @@ public class MediaResource {
                 }
             }
         }
-
-                private void printProcessOutput(Process process, String label) {
+        private String validateToken(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(JwtUtils.getSecretKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .getSubject();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+            }
+        }
+        private void printProcessOutput(Process process, String label) {
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
@@ -37,7 +57,7 @@ public class MediaResource {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-            }
+        }
     private static final String MEDIA_PATH = "/home/ignaciofortessoria/media";
 
 @POST
@@ -45,11 +65,21 @@ public class MediaResource {
 @Consumes(MediaType.MULTIPART_FORM_DATA)
 @Produces(MediaType.APPLICATION_JSON)
 public Response uploadMedia(
+        @HeaderParam("Authorization") String token,
         @FormDataParam("file") InputStream fileInputStream,
         @FormDataParam("file") FormDataContentDisposition fileMetaData,
         @FormDataParam("title") String title,
         @FormDataParam("description") String description,
         @FormDataParam("category") String category) {
+
+    if (token == null || token.isEmpty()) {
+        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+    }
+    
+    String requestingUsername = validateToken(token);
+    if (requestingUsername == null) {
+        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+    }
 
     String fileName = fileMetaData.getFileName();
     File uploadedFile = new File(MEDIA_PATH, fileName);
@@ -197,55 +227,73 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
     @Path("/delete")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response deleteMedia(@QueryParam("mediaid") int mediaid) {
-        try (Connection conn = DriverManager.getConnection(
-                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-
-            String selectQuery = "SELECT high_res_url, low_res_url, hls_url_1080p, hls_url_360p FROM media WHERE media_id = ?";
-            String deleteQuery = "DELETE FROM media WHERE media_id = ?";
-
-            try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
-                selectStmt.setInt(1, mediaid); // Corrección aquí
-                ResultSet rs = selectStmt.executeQuery();
-
-                if (rs.next()) {
-                    String highResUrl = rs.getString("high_res_url");
-                    String lowResUrl = rs.getString("low_res_url");
-                    String hlsUrl1080p = rs.getString("hls_url_1080p");
-                    String hlsUrl360p = rs.getString("hls_url_360p");
-
-                    File highResFile = new File(highResUrl.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
-                    File lowResFile = new File(lowResUrl.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
-                    File hlsDir1080p = new File(hlsUrl1080p.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
-                    File hlsDir360p = new File(hlsUrl360p.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
-
-                    deleteFileOrDirectory(highResFile);
-                    deleteFileOrDirectory(lowResFile);
-                    deleteFileOrDirectory(hlsDir1080p);
-                    deleteFileOrDirectory(hlsDir360p);
-
-                    try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
-                        deleteStmt.setInt(1, mediaid); // Corrección aquí
-                        int rowsAffected = deleteStmt.executeUpdate();
-
-                        if (rowsAffected == 0) {
-                            return Response.status(Response.Status.NOT_FOUND).entity("Media not found").build();
-                        }
-                        return Response.ok("{\"message\":\"Media deleted successfully!\"}").type(MediaType.APPLICATION_JSON).build();
-                    }
-                } else {
-                    return Response.status(Response.Status.NOT_FOUND)
-                        .entity("{\"message\":\"Media not found\"}")
-                        .type(MediaType.APPLICATION_JSON)
-                        .build();
-
-                }
+    public Response deleteMedia(@HeaderParam("Authorization") String token, @QueryParam("mediaid") int mediaid) {
+        
+        // Validar que el token no sea nulo o vacío
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+        }
+    System.out.println("Token recibido: " + token);
+        try {
+            // Validar el token y extraer el username del solicitante
+            String requestingUsername = validateToken(token);
+            if (requestingUsername == null) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
+
+            // Opcional: Verificar permisos en base al username (si aplica lógica adicional)
+
+            try (Connection conn = DriverManager.getConnection(
+                    "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+
+                String selectQuery = "SELECT high_res_url, low_res_url, hls_url_1080p, hls_url_360p FROM media WHERE media_id = ?";
+                String deleteQuery = "DELETE FROM media WHERE media_id = ?";
+
+                try (PreparedStatement selectStmt = conn.prepareStatement(selectQuery)) {
+                    selectStmt.setInt(1, mediaid);
+                    ResultSet rs = selectStmt.executeQuery();
+
+                    if (rs.next()) {
+                        String highResUrl = rs.getString("high_res_url");
+                        String lowResUrl = rs.getString("low_res_url");
+                        String hlsUrl1080p = rs.getString("hls_url_1080p");
+                        String hlsUrl360p = rs.getString("hls_url_360p");
+
+                        File highResFile = new File(highResUrl.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+                        File lowResFile = new File(lowResUrl.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+                        File hlsDir1080p = new File(hlsUrl1080p.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+                        File hlsDir360p = new File(hlsUrl360p.replace("http://34.175.133.0:8080/media/", MEDIA_PATH + "/"));
+
+                        deleteFileOrDirectory(highResFile);
+                        deleteFileOrDirectory(lowResFile);
+                        deleteFileOrDirectory(hlsDir1080p);
+                        deleteFileOrDirectory(hlsDir360p);
+
+                        try (PreparedStatement deleteStmt = conn.prepareStatement(deleteQuery)) {
+                            deleteStmt.setInt(1, mediaid);
+                            int rowsAffected = deleteStmt.executeUpdate();
+
+                            if (rowsAffected == 0) {
+                                return Response.status(Response.Status.NOT_FOUND).entity("{\"message\":\"Media not found\"}").build();
+                            }
+                            return Response.ok("{\"message\":\"Media deleted successfully!\"}").type(MediaType.APPLICATION_JSON).build();
+                        }
+                    } else {
+                        return Response.status(Response.Status.NOT_FOUND)
+                                .entity("{\"message\":\"Media not found\"}")
+                                .type(MediaType.APPLICATION_JSON)
+                                .build();
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
+            }
+        } catch (Exception e) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
         }
     }
+
 
     private void deleteFileOrDirectory(File fileOrDirectory) {
         if (fileOrDirectory.isDirectory()) {
@@ -260,10 +308,18 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
     @Path("/add")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response addMedia(Media media) {
+    public Response addMedia(@HeaderParam("Authorization") String token, Media media) {
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+        }
+
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
+
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-
             String query = "INSERT INTO media (title, description, high_res_url, low_res_url, category) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
                 stmt.setString(1, media.getTitle());
@@ -275,17 +331,25 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
             }
 
             return Response.status(Response.Status.CREATED).entity("Media added successfully!").build();
-
         } catch (SQLException e) {
             e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
         }
     }
 
-    @GET
+   @GET
     @Path("/category/{category}")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getMediaByCategory(@PathParam("category") String category) {
+    public Response getMediaByCategory(@HeaderParam("Authorization") String token, @PathParam("category") String category) {
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+        }
+
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
+
         List<Media> mediaList = new ArrayList<>();
         try (Connection conn = DriverManager.getConnection(
                 "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
@@ -313,35 +377,47 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
             e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
         }
-    }@GET
-@Path("/list")
-@Produces(MediaType.APPLICATION_JSON)
-public Response listMedia() {
-    List<Media> mediaList = new ArrayList<>();
-    try (Connection conn = DriverManager.getConnection(
-            "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-
-        String query = "SELECT media_id, title, description, high_res_url, low_res_url, category, hls_url_1080p, hls_url_360p FROM media";
-        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
-            while (rs.next()) {
-                Media media = new Media();
-                media.setMediaId(rs.getInt("media_id"));
-                media.setTitle(rs.getString("title"));
-                media.setDescription(rs.getString("description"));
-                media.setHighResUrl(rs.getString("high_res_url"));
-                media.setLowResUrl(rs.getString("low_res_url"));
-                media.setCategory(rs.getString("category"));
-                media.setHlsUrl1080p(rs.getString("hls_url_1080p"));
-                media.setHlsUrl360p(rs.getString("hls_url_360p"));
-                mediaList.add(media);
-            }
-        }
-        return Response.ok(mediaList).build();
-    } catch (SQLException e) {
-        e.printStackTrace();
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
     }
-}
+
+    @GET
+    @Path("/list")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response listMedia(@HeaderParam("Authorization") String token) {
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+        }
+
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
+
+        List<Media> mediaList = new ArrayList<>();
+        try (Connection conn = DriverManager.getConnection(
+                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+
+            String query = "SELECT media_id, title, description, high_res_url, low_res_url, category, hls_url_1080p, hls_url_360p FROM media";
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(query)) {
+                while (rs.next()) {
+                    Media media = new Media();
+                    media.setMediaId(rs.getInt("media_id"));
+                    media.setTitle(rs.getString("title"));
+                    media.setDescription(rs.getString("description"));
+                    media.setHighResUrl(rs.getString("high_res_url"));
+                    media.setLowResUrl(rs.getString("low_res_url"));
+                    media.setCategory(rs.getString("category"));
+                    media.setHlsUrl1080p(rs.getString("hls_url_1080p"));
+                    media.setHlsUrl360p(rs.getString("hls_url_360p"));
+                    mediaList.add(media);
+                }
+            }
+            return Response.ok(mediaList).build();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
+        }
+    }
+
 
     public class Media {
         private int mediaId;

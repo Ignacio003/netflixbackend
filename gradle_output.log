@@ -8,11 +8,11 @@ Reusing configuration cache.
 > Task :app:run
 [main] INFO org.eclipse.jetty.server.Server - jetty-11.0.14; built: 2023-02-22T23:41:48.575Z; git: 4601fe8dd805ce75b69c64466c115a162586641b; jvm 17.0.13+11-Ubuntu-2ubuntu120.04
 [main] INFO org.eclipse.jetty.server.session.DefaultSessionIdManager - Session workerName=node0
-Dec 04, 2024 5:45:42 PM org.glassfish.jersey.message.internal.MessagingBinders$EnabledProvidersBinder bindToBinder
+Dec 11, 2024 11:39:03 PM org.glassfish.jersey.message.internal.MessagingBinders$EnabledProvidersBinder bindToBinder
 WARNING: A class jakarta.activation.DataSource for a default provider MessageBodyWriter<jakarta.activation.DataSource> was not found. The provider is not available.
-Dec 04, 2024 5:45:42 PM org.glassfish.jersey.server.wadl.WadlFeature configure
+Dec 11, 2024 11:39:03 PM org.glassfish.jersey.server.wadl.WadlFeature configure
 WARNING: JAX-B API not found . WADL feature is disabled.
-[main] INFO org.eclipse.jetty.server.handler.ContextHandler - Started o.e.j.s.ServletContextHandler@463b4ac8{/,null,AVAILABLE}
-[main] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@26be92ad{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
-[main] INFO org.eclipse.jetty.server.Server - Started Server@490ab905{STARTING}[11.0.14,sto=0] @1408ms
+[main] INFO org.eclipse.jetty.server.handler.ContextHandler - Started o.e.j.s.ServletContextHandler@55342f40{/,null,AVAILABLE}
+[main] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@29774679{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
+[main] INFO org.eclipse.jetty.server.Server - Started Server@1ed4004b{STARTING}[11.0.14,sto=0] @1251ms
 Server started on port 8080
