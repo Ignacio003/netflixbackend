@@ -16,3 +16,22 @@ WARNING: JAX-B API not found . WADL feature is disabled.
 [main] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@29774679{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
 [main] INFO org.eclipse.jetty.server.Server - Started Server@1ed4004b{STARTING}[11.0.14,sto=0] @1251ms
 Server started on port 8080
+Token recibido para validación: [eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJNYXRlbyIsImlhdCI6MTczMzk2MDgzNywiZXhwIjoxNzMzOTYyNjM3fQ.gNGMfNxINp4QmvFAlvfhWN7S2g-MRJaN1EmARyNPWfE]
+
+> Task :app:run FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:run'.
+> Process 'command '/usr/lib/jvm/java-17-openjdk-amd64/bin/java'' finished with non-zero exit value 137
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 15m 29s
+4 actionable tasks: 4 executed
+Configuration cache entry reused.

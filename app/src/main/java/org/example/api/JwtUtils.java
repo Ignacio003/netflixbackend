@@ -6,7 +6,6 @@ import io.jsonwebtoken.security.Keys;
 import java.security.Key;
 
 public class JwtUtils {
-    // Clave secreta estática para que sea accesible por todas las clases
     private static final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
     private static final long TOKEN_EXPIRATION_MILLIS = 30 * 60 * 1000;
