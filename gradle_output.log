@@ -5,26 +5,38 @@ Reusing configuration cache.
 > Task :app:compileJava
 > Task :app:classes
 
-> Task :app:run
-[main] INFO org.eclipse.jetty.server.Server - jetty-11.0.14; built: 2023-02-22T23:41:48.575Z; git: 4601fe8dd805ce75b69c64466c115a162586641b; jvm 17.0.13+11-Ubuntu-2ubuntu120.04
-[main] INFO org.eclipse.jetty.server.session.DefaultSessionIdManager - Session workerName=node0
-Dec 11, 2024 11:39:03 PM org.glassfish.jersey.message.internal.MessagingBinders$EnabledProvidersBinder bindToBinder
-WARNING: A class jakarta.activation.DataSource for a default provider MessageBodyWriter<jakarta.activation.DataSource> was not found. The provider is not available.
-Dec 11, 2024 11:39:03 PM org.glassfish.jersey.server.wadl.WadlFeature configure
-WARNING: JAX-B API not found . WADL feature is disabled.
-[main] INFO org.eclipse.jetty.server.handler.ContextHandler - Started o.e.j.s.ServletContextHandler@55342f40{/,null,AVAILABLE}
-[main] INFO org.eclipse.jetty.server.AbstractConnector - Started ServerConnector@29774679{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}
-[main] INFO org.eclipse.jetty.server.Server - Started Server@1ed4004b{STARTING}[11.0.14,sto=0] @1251ms
-Server started on port 8080
-Token recibido para validación: [eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJNYXRlbyIsImlhdCI6MTczMzk2MDgzNywiZXhwIjoxNzMzOTYyNjM3fQ.gNGMfNxINp4QmvFAlvfhWN7S2g-MRJaN1EmARyNPWfE]
-
 > Task :app:run FAILED
+[main] INFO org.eclipse.jetty.server.Server - jetty-11.0.14; built: 2023-02-22T23:41:48.575Z; git: 4601fe8dd805ce75b69c64466c115a162586641b; jvm 17.0.13+11-Ubuntu-2ubuntu120.04
+Exception in thread "main" java.io.IOException: Failed to bind to 0.0.0.0/0.0.0.0:8080
+	at org.eclipse.jetty.server.ServerConnector.openAcceptChannel(ServerConnector.java:344)
+	at org.eclipse.jetty.server.ServerConnector.open(ServerConnector.java:304)
+	at org.eclipse.jetty.server.Server.lambda$doStart$0(Server.java:402)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.accept(ForEachOps.java:183)
+	at java.base/java.util.stream.ReferencePipeline$3$1.accept(ReferencePipeline.java:197)
+	at java.base/java.util.stream.ReferencePipeline$2$1.accept(ReferencePipeline.java:179)
+	at java.base/java.util.Spliterators$ArraySpliterator.forEachRemaining(Spliterators.java:992)
+	at java.base/java.util.stream.AbstractPipeline.copyInto(AbstractPipeline.java:509)
+	at java.base/java.util.stream.AbstractPipeline.wrapAndCopyInto(AbstractPipeline.java:499)
+	at java.base/java.util.stream.ForEachOps$ForEachOp.evaluateSequential(ForEachOps.java:150)
+	at java.base/java.util.stream.ForEachOps$ForEachOp$OfRef.evaluateSequential(ForEachOps.java:173)
+	at java.base/java.util.stream.AbstractPipeline.evaluate(AbstractPipeline.java:234)
+	at java.base/java.util.stream.ReferencePipeline.forEach(ReferencePipeline.java:596)
+	at org.eclipse.jetty.server.Server.doStart(Server.java:398)
+	at org.eclipse.jetty.util.component.AbstractLifeCycle.start(AbstractLifeCycle.java:93)
+	at org.example.StreamingServiceApplication.main(StreamingServiceApplication.java:28)
+Caused by: java.net.BindException: Address already in use
+	at java.base/sun.nio.ch.Net.bind0(Native Method)
+	at java.base/sun.nio.ch.Net.bind(Net.java:555)
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.netBind(ServerSocketChannelImpl.java:337)
+	at java.base/sun.nio.ch.ServerSocketChannelImpl.bind(ServerSocketChannelImpl.java:294)
+	at org.eclipse.jetty.server.ServerConnector.openAcceptChannel(ServerConnector.java:339)
+	... 15 more
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
 Execution failed for task ':app:run'.
-> Process 'command '/usr/lib/jvm/java-17-openjdk-amd64/bin/java'' finished with non-zero exit value 137
+> Process 'command '/usr/lib/jvm/java-17-openjdk-amd64/bin/java'' finished with non-zero exit value 1
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -32,6 +44,6 @@ Execution failed for task ':app:run'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 15m 29s
+BUILD FAILED in 2s
 4 actionable tasks: 4 executed
 Configuration cache entry reused.

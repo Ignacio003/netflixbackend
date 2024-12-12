@@ -222,12 +222,61 @@ public class UserResource {
         }
     }
 
-    // Método para registrar un nuevo usuario
+ @POST
+@Path("/register")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+public Response registerUser(User user) {
+    if (user.getUsername() == null || user.getUsername().length() < 2) {
+        return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Username must be at least 2 characters long\"}").build();
+    }
+    if (user.getPasswordHash() == null || user.getPasswordHash().length() < 2) {
+        return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Password must be at least 2 characters long\"}").build();
+    }
+
+    try (Connection conn = DriverManager.getConnection(
+            "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+
+        String checkQuery = "SELECT COUNT(*) FROM users WHERE username = ?";
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+            checkStmt.setString(1, user.getUsername());
+            try (ResultSet rs = checkStmt.executeQuery()) {
+                if (rs.next() && rs.getInt(1) > 0) {
+                    return Response.status(Response.Status.CONFLICT).entity("{\"message\":\"Username already exists\"}").build();
+                }
+            }
+        }
+
+        String hashedPassword = BCrypt.hashpw(user.getPasswordHash(), BCrypt.gensalt());
+        String query = "INSERT INTO users (username, password_hash, es_admin) VALUES (?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setString(1, user.getUsername());
+            stmt.setString(2, hashedPassword);
+            stmt.setBoolean(3, false); // es_admin set to false
+            stmt.executeUpdate();
+        }
+
+        return Response.status(Response.Status.CREATED).entity("{\"message\":\"User registered successfully!\"}").build();
+
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
+    }
+    }
     @POST
-    @Path("/register")
+    @Path("/registeradmin")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response registerUser(User user) {
+    public Response registerAdmin(@HeaderParam("Authorization") String token, User user) {
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+        }
+
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
+
         if (user.getUsername() == null || user.getUsername().length() < 2) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Username must be at least 2 characters long\"}").build();
         }
@@ -257,14 +306,13 @@ public class UserResource {
                 stmt.executeUpdate();
             }
 
-            return Response.status(Response.Status.CREATED).entity("{\"message\":\"User registered successfully!\"}").build();
+            return Response.status(Response.Status.CREATED).entity("{\"message\":\"Admin user registered successfully!\"}").build();
 
         } catch (SQLException e) {
             e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
         }
     }
-
     // Método para iniciar sesión como administrador
     @POST
     @Path("/loginadmin")
