@@ -182,7 +182,16 @@ public Response uploadMedia(
 @GET
 @Path("/{subPath: .*}")
 @Produces(MediaType.APPLICATION_OCTET_STREAM)
-public Response serveFile(@PathParam("subPath") String subPath) {
+public Response serveFile(@HeaderParam("Authorization") String token, @PathParam("subPath") String subPath) {
+    if (token == null || token.isEmpty()) {
+        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+    }
+
+    String requestingUsername = validateToken(token);
+    if (requestingUsername == null) {
+        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+    }
+
     File file = new File(MEDIA_PATH, subPath);
     if (!file.exists() || file.isDirectory()) {
         return Response.status(Response.Status.NOT_FOUND)
@@ -204,7 +213,16 @@ public Response serveFile(@PathParam("subPath") String subPath) {
 @GET
 @Path("/{fileName}")
 @Produces(MediaType.APPLICATION_OCTET_STREAM)
-public Response streamMedia(@PathParam("fileName") String fileName) {
+public Response streamMedia(@HeaderParam("Authorization") String token, @PathParam("fileName") String fileName) {
+    if (token == null || token.isEmpty()) {
+        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+    }
+
+    String requestingUsername = validateToken(token);
+    if (requestingUsername == null) {
+        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+    }
+
     File file = new File(MEDIA_PATH, fileName);
     if (!file.exists()) {
         return Response.status(Response.Status.NOT_FOUND)
@@ -221,8 +239,7 @@ public Response streamMedia(@PathParam("fileName") String fileName) {
         }
     }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"")
     .build();
-
-    }
+}
     @DELETE
     @Path("/delete")
     @Consumes(MediaType.APPLICATION_JSON)
