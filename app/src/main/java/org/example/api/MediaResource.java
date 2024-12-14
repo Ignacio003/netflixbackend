@@ -59,7 +59,6 @@ public class MediaResource {
                 }
         }
     private static final String MEDIA_PATH = "/home/ignaciofortessoria/media";
-
 @POST
 @Path("/upload")
 @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -134,12 +133,12 @@ public Response uploadMedia(
         }
 
         return Response.status(Response.Status.CREATED)
-                .entity("{\"message\":\"Media uploaded and processed successfully!\"}").build();
+                .entity("{\"message\":\"Media uploaded successfully!\"}").type(MediaType.APPLICATION_JSON).build();
 
     } catch (Exception e) {
         cleanup(uploadedFile, hlsDir1080p, hlsDir360p, mp4File360p);
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity("{\"message\":\"Error uploading media: " + e.getMessage() + "\"}").build();
+                .entity("{\"message\":\"Error uploading media: " + e.getMessage() + "\"}").type(MediaType.APPLICATION_JSON).build();
     }
 }
 
