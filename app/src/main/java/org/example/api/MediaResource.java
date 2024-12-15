@@ -269,39 +269,6 @@ public class MediaResource {
         fileOrDirectory.delete();
     }
 
-    @POST
-    @Path("/add")
-    @Consumes(MediaType.APPLICATION_JSON)
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response addMedia(@HeaderParam("Authorization") String token, Media media) {
-        if (token == null || token.isEmpty()) {
-            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
-        }
-
-        String requestingUsername = validateToken(token);
-        if (requestingUsername == null) {
-            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
-        }
-
-        try (Connection conn = DriverManager.getConnection(
-                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-            String query = "INSERT INTO media (title, description, high_res_url, low_res_url, category) VALUES (?, ?, ?, ?, ?)";
-            try (PreparedStatement stmt = conn.prepareStatement(query)) {
-                stmt.setString(1, media.getTitle());
-                stmt.setString(2, media.getDescription());
-                stmt.setString(3, media.getHighResUrl());
-                stmt.setString(4, media.getLowResUrl());
-                stmt.setString(5, media.getCategory());
-                stmt.executeUpdate();
-            }
-
-            return Response.status(Response.Status.CREATED).entity("Media added successfully!").build();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Database error").build();
-        }
-    }
-
     @GET
     @Path("/category/{category}")
     @Produces(MediaType.APPLICATION_JSON)
