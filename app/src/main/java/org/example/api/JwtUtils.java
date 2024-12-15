@@ -2,7 +2,6 @@ package org.example.api;
 
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-
 import java.security.Key;
 
 public class JwtUtils {

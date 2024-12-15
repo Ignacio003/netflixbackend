@@ -6,16 +6,13 @@ import jakarta.ws.rs.core.Response;
 import org.glassfish.jersey.media.multipart.FormDataContentDisposition;
 import org.glassfish.jersey.media.multipart.FormDataParam;
 import jakarta.ws.rs.core.StreamingOutput;
-
 import java.io.*;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
-// Dependencias JWT
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-
 import java.security.Key;
 import java.util.Date;
 import org.example.api.JwtUtils;
@@ -23,7 +20,7 @@ import org.example.api.JwtUtils;
 
 @Path("/media")
 public class MediaResource {
-            private void cleanup(File... files) {
+        private void cleanup(File... files) {
             for (File file : files) {
                 if (file.exists()) {
                     if (file.isDirectory()) {
@@ -37,12 +34,7 @@ public class MediaResource {
         }
         private String validateToken(String token) {
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(JwtUtils.getSecretKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getSubject();
+            return Jwts.parserBuilder().setSigningKey(JwtUtils.getSecretKey()).build().parseClaimsJws(token).getBody().getSubject();
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -59,169 +51,159 @@ public class MediaResource {
                 }
         }
     private static final String MEDIA_PATH = "/home/ignaciofortessoria/media";
-@POST
-@Path("/upload")
-@Consumes(MediaType.MULTIPART_FORM_DATA)
-@Produces(MediaType.APPLICATION_JSON)
-public Response uploadMedia(
-        @HeaderParam("Authorization") String token,
-        @FormDataParam("file") InputStream fileInputStream,
-        @FormDataParam("file") FormDataContentDisposition fileMetaData,
-        @FormDataParam("title") String title,
-        @FormDataParam("description") String description,
-        @FormDataParam("category") String category) {
+    @POST
+    @Path("/upload")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response uploadMedia(
+            @HeaderParam("Authorization") String token,
+            @FormDataParam("file") InputStream fileInputStream,
+            @FormDataParam("file") FormDataContentDisposition fileMetaData,
+            @FormDataParam("title") String title,
+            @FormDataParam("description") String description,
+            @FormDataParam("category") String category) {
 
-    System.out.println("Starting media upload...");
+        System.out.println("Starting media upload...");
 
-    if (token == null || token.isEmpty()) {
-        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
-    }
-
-    String requestingUsername = validateToken(token);
-    if (requestingUsername == null) {
-        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
-    }
-
-    String fileName = fileMetaData.getFileName();
-    File uploadedFile = new File(MEDIA_PATH, fileName);
-    File hlsDir1080p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_1080p"));
-    File hlsDir360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_360p"));
-    File mp4File360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_360p.mp4"));
-
-    try {
-        try (FileOutputStream out = new FileOutputStream(uploadedFile)) {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                out.write(buffer, 0, bytesRead);
-            }
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
         }
 
-        if (!hlsDir1080p.exists()) hlsDir1080p.mkdir();
-        if (!hlsDir360p.exists()) hlsDir360p.mkdir();
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
 
-        Process ffmpeg1080p = new ProcessBuilder("ffmpeg", "-i", uploadedFile.getAbsolutePath(), "-vf", "scale=-2:1080", "-start_number", "0", "-preset", "veryfast", "-threads", "0", "-hls_time", "10", "-hls_list_size", "0", "-f", "hls", new File(hlsDir1080p, "playlist.m3u8").getAbsolutePath()).redirectErrorStream(true).start();
-        Process ffmpeg360p = new ProcessBuilder("ffmpeg", "-i", uploadedFile.getAbsolutePath(), "-vf", "scale=-2:360", "-start_number", "0", "-hls_time", "10", "-preset", "veryfast", "-threads", "0", "-hls_list_size", "0", "-f", "hls", new File(hlsDir360p, "playlist.m3u8").getAbsolutePath()).redirectErrorStream(true).start();
-        Process ffmpegMp4360p = new ProcessBuilder("ffmpeg", "-i", uploadedFile.getAbsolutePath(), "-vf", "scale=-2:360", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-strict", "experimental", mp4File360p.getAbsolutePath()).redirectErrorStream(true).start();
+        String fileName = fileMetaData.getFileName();
+        File uploadedFile = new File(MEDIA_PATH, fileName);
+        File hlsDir1080p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_1080p"));
+        File hlsDir360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_360p"));
+        File mp4File360p = new File(MEDIA_PATH, fileName.replace(".mp4", "_360p.mp4"));
 
-        int exitCode1080p = ffmpeg1080p.waitFor();
-        int exitCode360p = ffmpeg360p.waitFor();
-        int exitCodeMp4360p = ffmpegMp4360p.waitFor();
+        try {
+            try (FileOutputStream out = new FileOutputStream(uploadedFile)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+            }
 
-        if (exitCode1080p != 0 || exitCode360p != 0 || exitCodeMp4360p != 0) {
+            if (!hlsDir1080p.exists()) hlsDir1080p.mkdir();
+            if (!hlsDir360p.exists()) hlsDir360p.mkdir();
+
+            Process ffmpeg1080p = new ProcessBuilder("ffmpeg", "-i", uploadedFile.getAbsolutePath(), "-vf", "scale=-2:1080", "-start_number", "0", "-preset", "veryfast", "-threads", "0", "-hls_time", "10", "-hls_list_size", "0", "-f", "hls", new File(hlsDir1080p, "playlist.m3u8").getAbsolutePath()).redirectErrorStream(true).start();
+            Process ffmpeg360p = new ProcessBuilder("ffmpeg", "-i", uploadedFile.getAbsolutePath(), "-vf", "scale=-2:360", "-start_number", "0", "-hls_time", "10", "-preset", "veryfast", "-threads", "0", "-hls_list_size", "0", "-f", "hls", new File(hlsDir360p, "playlist.m3u8").getAbsolutePath()).redirectErrorStream(true).start();
+            Process ffmpegMp4360p = new ProcessBuilder("ffmpeg", "-i", uploadedFile.getAbsolutePath(), "-vf", "scale=-2:360", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac", "-strict", "experimental", mp4File360p.getAbsolutePath()).redirectErrorStream(true).start();
+
+            int exitCode1080p = ffmpeg1080p.waitFor();
+            int exitCode360p = ffmpeg360p.waitFor();
+            int exitCodeMp4360p = ffmpegMp4360p.waitFor();
+
+            if (exitCode1080p != 0 || exitCode360p != 0 || exitCodeMp4360p != 0) {
+                cleanup(uploadedFile, hlsDir1080p, hlsDir360p, mp4File360p);
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Error generating HLS or MP4 versions\"}").build();
+            }
+
+            String hlsUrl1080p = "http://34.175.133.0:8080/media/" + hlsDir1080p.getName() + "/playlist.m3u8";
+            String hlsUrl360p = "http://34.175.133.0:8080/media/" + hlsDir360p.getName() + "/playlist.m3u8";
+            String mp4Url360p = "http://34.175.133.0:8080/media/" + mp4File360p.getName();
+            String downloadUrl = "http://34.175.133.0:8080/media/" + fileName;
+
+            try (Connection conn = DriverManager.getConnection("jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+                String query = "INSERT INTO media (title, description, high_res_url, low_res_url, category, hls_url_1080p, hls_url_360p) VALUES (?, ?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    stmt.setString(1, title);
+                    stmt.setString(2, description);
+                    stmt.setString(3, downloadUrl);
+                    stmt.setString(4, mp4Url360p);
+                    stmt.setString(5, category);
+                    stmt.setString(6, hlsUrl1080p);
+                    stmt.setString(7, hlsUrl360p);
+                    stmt.executeUpdate();
+                }
+            }
+
+            return Response.status(Response.Status.CREATED).entity("{\"message\":\"Media uploaded successfully!\"}").type(MediaType.APPLICATION_JSON).build();
+
+        } catch (Exception e) {
             cleanup(uploadedFile, hlsDir1080p, hlsDir360p, mp4File360p);
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Error generating HLS or MP4 versions\"}").build();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Error uploading media: " + e.getMessage() + "\"}").type(MediaType.APPLICATION_JSON).build();
+        }
+    }
+
+    @GET
+    @Path("/{subPath: .*}")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response serveFile(@HeaderParam("Authorization") String token, @PathParam("subPath") String subPath) {
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
         }
 
-        String hlsUrl1080p = "http://34.175.133.0:8080/media/" + hlsDir1080p.getName() + "/playlist.m3u8";
-        String hlsUrl360p = "http://34.175.133.0:8080/media/" + hlsDir360p.getName() + "/playlist.m3u8";
-        String mp4Url360p = "http://34.175.133.0:8080/media/" + mp4File360p.getName();
-        String downloadUrl = "http://34.175.133.0:8080/media/" + fileName;
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
 
-        try (Connection conn = DriverManager.getConnection("jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
-            String query = "INSERT INTO media (title, description, high_res_url, low_res_url, category, hls_url_1080p, hls_url_360p) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            try (PreparedStatement stmt = conn.prepareStatement(query)) {
-                stmt.setString(1, title);
-                stmt.setString(2, description);
-                stmt.setString(3, downloadUrl);
-                stmt.setString(4, mp4Url360p);
-                stmt.setString(5, category);
-                stmt.setString(6, hlsUrl1080p);
-                stmt.setString(7, hlsUrl360p);
-                stmt.executeUpdate();
+        File file = new File(MEDIA_PATH, subPath);
+        if (!file.exists() || file.isDirectory()) {
+            return Response.status(Response.Status.NOT_FOUND).entity("File not found or path is a directory").build();
+        }
+
+        return Response.ok((StreamingOutput) output -> {
+            try (InputStream input = new FileInputStream(file)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, bytesRead);
+                }
             }
+        }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"").build();
+    }
+
+    @GET
+    @Path("/{fileName}")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response streamMedia(@HeaderParam("Authorization") String token, @PathParam("fileName") String fileName) {
+        if (token == null || token.isEmpty()) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
         }
 
-        return Response.status(Response.Status.CREATED)
-                .entity("{\"message\":\"Media uploaded successfully!\"}").type(MediaType.APPLICATION_JSON).build();
+        String requestingUsername = validateToken(token);
+        if (requestingUsername == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
+        }
 
-    } catch (Exception e) {
-        cleanup(uploadedFile, hlsDir1080p, hlsDir360p, mp4File360p);
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity("{\"message\":\"Error uploading media: " + e.getMessage() + "\"}").type(MediaType.APPLICATION_JSON).build();
-    }
-}
+        File file = new File(MEDIA_PATH, fileName);
+        if (!file.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).entity("File not found").build();
+        }
 
-@GET
-@Path("/{subPath: .*}")
-@Produces(MediaType.APPLICATION_OCTET_STREAM)
-public Response serveFile(@HeaderParam("Authorization") String token, @PathParam("subPath") String subPath) {
-    if (token == null || token.isEmpty()) {
-        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
-    }
-
-    String requestingUsername = validateToken(token);
-    if (requestingUsername == null) {
-        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
-    }
-
-    File file = new File(MEDIA_PATH, subPath);
-    if (!file.exists() || file.isDirectory()) {
-        return Response.status(Response.Status.NOT_FOUND)
-                .entity("File not found or path is a directory").build();
-    }
-
-    return Response.ok((StreamingOutput) output -> {
-        try (InputStream input = new FileInputStream(file)) {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = input.read(buffer)) != -1) {
-                output.write(buffer, 0, bytesRead);
+        return Response.ok((StreamingOutput) output -> {
+            try (InputStream input = new FileInputStream(file)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = input.read(buffer)) != -1) {
+                    output.write(buffer, 0, bytesRead);
+                }
             }
-        }
-    }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"")
-    .build();
-}
-
-@GET
-@Path("/{fileName}")
-@Produces(MediaType.APPLICATION_OCTET_STREAM)
-public Response streamMedia(@HeaderParam("Authorization") String token, @PathParam("fileName") String fileName) {
-    if (token == null || token.isEmpty()) {
-        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
+        }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"").build();
     }
-
-    String requestingUsername = validateToken(token);
-    if (requestingUsername == null) {
-        return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
-    }
-
-    File file = new File(MEDIA_PATH, fileName);
-    if (!file.exists()) {
-        return Response.status(Response.Status.NOT_FOUND)
-                .entity("File not found").build();
-    }
-
-    return Response.ok((StreamingOutput) output -> {
-        try (InputStream input = new FileInputStream(file)) {
-            byte[] buffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = input.read(buffer)) != -1) {
-                output.write(buffer, 0, bytesRead);
-            }
-        }
-    }).header("Content-Disposition", "inline; filename=\"" + file.getName() + "\"")
-    .build();
-}
     @DELETE
     @Path("/delete")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteMedia(@HeaderParam("Authorization") String token, @QueryParam("mediaid") int mediaid) {
         
-        // Validar que el token no sea nulo o vacío
         if (token == null || token.isEmpty()) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
         }
     System.out.println("Token recibido: " + token);
         try {
-            // Validar el token y extraer el username del solicitante
             String requestingUsername = validateToken(token);
             if (requestingUsername == null) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
             }
-
-            // Opcional: Verificar permisos en base al username (si aplica lógica adicional)
 
             try (Connection conn = DriverManager.getConnection(
                     "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
@@ -259,10 +241,7 @@ public Response streamMedia(@HeaderParam("Authorization") String token, @PathPar
                             return Response.ok("{\"message\":\"Media deleted successfully!\"}").type(MediaType.APPLICATION_JSON).build();
                         }
                     } else {
-                        return Response.status(Response.Status.NOT_FOUND)
-                                .entity("{\"message\":\"Media not found\"}")
-                                .type(MediaType.APPLICATION_JSON)
-                                .build();
+                        return Response.status(Response.Status.NOT_FOUND).entity("{\"message\":\"Media not found\"}").type(MediaType.APPLICATION_JSON).build();
                     }
                 }
             } catch (SQLException e) {
@@ -317,7 +296,7 @@ public Response streamMedia(@HeaderParam("Authorization") String token, @PathPar
         }
     }
 
-   @GET
+    @GET
     @Path("/category/{category}")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getMediaByCategory(@HeaderParam("Authorization") String token, @PathParam("category") String category) {

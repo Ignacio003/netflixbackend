@@ -5,27 +5,19 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.sql.*;
 import org.mindrot.jbcrypt.BCrypt;
-
-// Dependencias JWT
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-
 import java.security.Key;
 import java.util.Date;
 import org.example.api.JwtUtils;
+
 @Path("/users")
 public class UserResource {
 
-    // Uso de la clave desde JwtUtils
     private String validateToken(String token) {
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(JwtUtils.getSecretKey())
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody()
-                    .getSubject();
+            return Jwts.parserBuilder().setSigningKey(JwtUtils.getSecretKey()).build().parseClaimsJws(token)getBody().getSubject();
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -36,38 +28,29 @@ public class UserResource {
         Date now = new Date();
         Date exp = new Date(now.getTime() + JwtUtils.getTokenExpiration());
 
-        return Jwts.builder()
-                .setSubject(username)
-                .setIssuedAt(now)
-                .setExpiration(exp)
-                .signWith(JwtUtils.getSecretKey())
-                .compact();
+        return Jwts.builder().setSubject(username).setIssuedAt(now).setExpiration(exp).signWith(JwtUtils.getSecretKey()).compact();
     }
 
-    // Método para eliminar un usuario
     @DELETE
     @Path("/delete")
     @Produces(MediaType.APPLICATION_JSON)
     public Response deleteUser(@HeaderParam("Authorization") String token, @QueryParam("username") String targetUsername) {
-        // Validar que el token no sea nulo o vacío
+
         if (token == null || token.isEmpty()) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
         }
 
-        // Validar que el username objetivo no sea nulo o vacío
         if (targetUsername == null || targetUsername.isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Target username is required\"}").build();
         }
 
         try {
             System.out.println("Token recibido para validación: [" + token + "]");
-            // Validar el token y extraer el username del solicitante
             String requestingUsername = validateToken(token);
             if (requestingUsername == null) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
             }
 
-            // Comprobar si el usuario que solicita tiene permisos
             try (Connection conn = DriverManager.getConnection(
                     "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
@@ -78,7 +61,6 @@ public class UserResource {
                         if (rs.next()) {
                             boolean isAdmin = rs.getBoolean("es_admin");
 
-                            // Solo administradores pueden eliminar otros usuarios
                             if (!isAdmin && !requestingUsername.equals(targetUsername)) {
                                 return Response.status(Response.Status.FORBIDDEN).entity("{\"message\":\"You do not have permission to delete this user\"}").build();
                             }
@@ -89,7 +71,6 @@ public class UserResource {
                     }
                 }
 
-                // Proceder a eliminar el usuario objetivo
                 String deleteQuery = "DELETE FROM users WHERE username = ?";
                 try (PreparedStatement stmt = conn.prepareStatement(deleteQuery)) {
                     stmt.setString(1, targetUsername);
@@ -112,24 +93,21 @@ public class UserResource {
 
     
 
-        @GET
+    @GET
     @Path("/list")
     @Produces(MediaType.APPLICATION_JSON)
     public Response listUsers(@HeaderParam("Authorization") String token) {
-        // Validar que el token no sea nulo o vacío
         if (token == null || token.isEmpty()) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Token is required\"}").build();
         }
 
         try {
             System.out.println("Token recibido para validación: [" + token + "]");
-            // Validar el token y extraer el username del solicitante
             String requestingUsername = validateToken(token);
             if (requestingUsername == null) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
             }
 
-            // Verificar si el usuario tiene privilegios de administrador
             try (Connection conn = DriverManager.getConnection(
                     "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
@@ -149,7 +127,6 @@ public class UserResource {
                     }
                 }
 
-                // Obtener la lista de usuarios
                 String listQuery = "SELECT username, es_admin FROM users";
                 try (PreparedStatement stmt = conn.prepareStatement(listQuery)) {
                     try (ResultSet rs = stmt.executeQuery()) {
@@ -185,15 +162,14 @@ public class UserResource {
         }
     }
 
-
-    // Método para iniciar sesión
     @POST
     @Path("/login")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response loginUser(User user) {
         try (Connection conn = DriverManager.getConnection(
-                "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+            // e o usuario default
+            "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
             String query = "SELECT password_hash FROM users WHERE username = ?";
             try (PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -202,7 +178,6 @@ public class UserResource {
                     if (rs.next()) {
                         String storedHash = rs.getString("password_hash");
                         if (BCrypt.checkpw(user.getPasswordHash(), storedHash)) {
-                            // Generar un token JWT
                             String token = generateToken(user.getUsername());
 
                             String jsonResponse = String.format("{\"message\":\"Login successful!\", \"token\":\"%s\"}", token);
@@ -222,46 +197,45 @@ public class UserResource {
         }
     }
 
- @POST
-@Path("/register")
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
-public Response registerUser(User user) {
-    if (user.getUsername() == null || user.getUsername().length() < 2) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Username must be at least 2 characters long\"}").build();
-    }
-    if (user.getPasswordHash() == null || user.getPasswordHash().length() < 2) {
-        return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Password must be at least 2 characters long\"}").build();
-    }
+    @POST
+    @Path("/register")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response registerUser(User user) {
+        if (user.getUsername() == null || user.getUsername().length() < 2) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Username must be at least 2 characters long\"}").build();
+        }
+        if (user.getPasswordHash() == null || user.getPasswordHash().length() < 2) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("{\"message\":\"Password must be at least 2 characters long\"}").build();
+        }
 
-    try (Connection conn = DriverManager.getConnection(
-            "jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
+        try (Connection conn = DriverManager.getConnection("jdbc:mariadb://localhost:3306/streaming_service", "stream_user", "your_password")) {
 
-        String checkQuery = "SELECT COUNT(*) FROM users WHERE username = ?";
-        try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
-            checkStmt.setString(1, user.getUsername());
-            try (ResultSet rs = checkStmt.executeQuery()) {
-                if (rs.next() && rs.getInt(1) > 0) {
-                    return Response.status(Response.Status.CONFLICT).entity("{\"message\":\"Username already exists\"}").build();
+            String checkQuery = "SELECT COUNT(*) FROM users WHERE username = ?";
+            try (PreparedStatement checkStmt = conn.prepareStatement(checkQuery)) {
+                checkStmt.setString(1, user.getUsername());
+                try (ResultSet rs = checkStmt.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return Response.status(Response.Status.CONFLICT).entity("{\"message\":\"Username already exists\"}").build();
+                    }
                 }
             }
+
+            String hashedPassword = BCrypt.hashpw(user.getPasswordHash(), BCrypt.gensalt());
+            String query = "INSERT INTO users (username, password_hash, es_admin) VALUES (?, ?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                stmt.setString(1, user.getUsername());
+                stmt.setString(2, hashedPassword);
+                stmt.setBoolean(3, false); // es_admin falso
+                stmt.executeUpdate();
+            }
+
+            return Response.status(Response.Status.CREATED).entity("{\"message\":\"User registered successfully!\"}").build();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
         }
-
-        String hashedPassword = BCrypt.hashpw(user.getPasswordHash(), BCrypt.gensalt());
-        String query = "INSERT INTO users (username, password_hash, es_admin) VALUES (?, ?, ?)";
-        try (PreparedStatement stmt = conn.prepareStatement(query)) {
-            stmt.setString(1, user.getUsername());
-            stmt.setString(2, hashedPassword);
-            stmt.setBoolean(3, false); // es_admin set to false
-            stmt.executeUpdate();
-        }
-
-        return Response.status(Response.Status.CREATED).entity("{\"message\":\"User registered successfully!\"}").build();
-
-    } catch (SQLException e) {
-        e.printStackTrace();
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
-    }
     }
     @POST
     @Path("/registeradmin")
@@ -313,7 +287,6 @@ public Response registerUser(User user) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
         }
     }
-    // Método para iniciar sesión como administrador
     @POST
     @Path("/loginadmin")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -331,7 +304,6 @@ public Response registerUser(User user) {
                         boolean isAdmin = rs.getBoolean("es_admin");
 
                         if (BCrypt.checkpw(user.getPasswordHash(), storedHash) && isAdmin) {
-                            // Generar un token JWT (opcionalmente distinto para admin)
                             String token = generateToken(user.getUsername());
 
                             String jsonResponse = String.format("{\"message\":\"Admin login successful!\", \"token\":\"%s\"}", token);
@@ -351,8 +323,6 @@ public Response registerUser(User user) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Database error\"}").build();
         }
     }
-
-    // Clase interna para manejar el usuario en el cuerpo de las peticiones
     public static class User {
         private String username;
         private String passwordHash;

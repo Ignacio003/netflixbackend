@@ -3,39 +3,26 @@
  */
 
 plugins {
-    id 'application' // Para soporte de aplicaciones CLI en Java
+    id 'application' 
 }
 
 repositories {
-    mavenCentral() // Usar Maven Central para resolver dependencias
+    mavenCentral() 
 }
 
 dependencies {
-    // Dependencias para Jetty y Jersey
     implementation 'org.eclipse.jetty:jetty-server:11.0.14'
     implementation 'org.eclipse.jetty:jetty-servlet:11.0.14'
     implementation 'org.glassfish.jersey.containers:jersey-container-servlet:3.1.2'
     implementation 'org.glassfish.jersey.inject:jersey-hk2:3.1.2' 
     implementation 'org.glassfish.jersey.media:jersey-media-json-binding:3.1.2'
-    // Dependencia para conexión con MariaDB
     implementation 'org.mariadb.jdbc:mariadb-java-client:3.1.0'
-
-    // API de Jakarta para soporte de JAX-RS
     implementation 'jakarta.ws.rs:jakarta.ws.rs-api:3.1.0'
-
-    // Logger para evitar advertencias de SLF4J
     implementation 'org.slf4j:slf4j-simple:2.0.9'
-
-    // Dependencias de prueba con JUnit
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
     implementation 'org.glassfish.jersey.media:jersey-media-multipart:3.1.2'
-
-
-    //cifrado
     implementation 'org.mindrot:jbcrypt:0.4'
-
-    // Dependencias para generación de tokens
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
@@ -44,14 +31,14 @@ dependencies {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17) // Definir versión de Java
+        languageVersion = JavaLanguageVersion.of(17) 
     }
 }
 
 application {
-    mainClass = 'org.example.StreamingServiceApplication' // Clase principal de la aplicación
+    mainClass = 'org.example.StreamingServiceApplication' 
 }
 
 tasks.named('test') {
-    useJUnitPlatform() // Configurar plataforma JUnit para pruebas
+    useJUnitPlatform()
 }
