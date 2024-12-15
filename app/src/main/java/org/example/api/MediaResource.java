@@ -49,7 +49,8 @@ public class MediaResource {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-        }
+    }
+    //CHANGE MEDIA PATH IF SEVER LOCATION DIFERENT.
     private static final String MEDIA_PATH = "/home/ignaciofortessoria/media";
     @POST
     @Path("/upload")
@@ -73,7 +74,12 @@ public class MediaResource {
         if (requestingUsername == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("{\"message\":\"Invalid token\"}").build();
         }
-
+        File mediaDir = new File(MEDIA_PATH);
+        if (!mediaDir.exists()) {
+            if (!mediaDir.mkdirs()) {
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("{\"message\":\"Failed to create media directory\"}").type(MediaType.APPLICATION_JSON).build();
+            }
+        }
         String fileName = fileMetaData.getFileName();
         File uploadedFile = new File(MEDIA_PATH, fileName);
         File hlsDir1080p = new File(MEDIA_PATH, fileName.replace(".mp4", "_hls_1080p"));

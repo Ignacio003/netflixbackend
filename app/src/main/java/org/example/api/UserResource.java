@@ -17,7 +17,7 @@ public class UserResource {
 
     private String validateToken(String token) {
         try {
-            return Jwts.parserBuilder().setSigningKey(JwtUtils.getSecretKey()).build().parseClaimsJws(token)getBody().getSubject();
+            return Jwts.parserBuilder().setSigningKey(JwtUtils.getSecretKey()).build().parseClaimsJws(token).getBody().getSubject();
         } catch (Exception e) {
             e.printStackTrace();
             return null;
